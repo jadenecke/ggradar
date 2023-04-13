@@ -7,11 +7,12 @@
 #' @param max MAXIMUM value required for the plotted axes (same value will be applied to all axes)
 #'
 #' @return a dataframe of the calculated axis paths
-CalculateAxisPath <- function(var.names, min, max) {
+CalculateAxisPath <- function(var.names, min, max, start) {
   # var.names <- c("v1","v2","v3","v4","v5")
   n.vars <- length(var.names) # number of vars (axes) required
   # Cacluate required number of angles (in radians)
-  angles <- seq(from = 0, to = 2 * pi, by = (2 * pi) / n.vars)
+  startRadians <- start * (pi/180)
+  angles <- seq(from = 0 + startRadians, to = (2 * pi) + startRadians, by = (2 * pi) / n.vars) %% (2 * pi)
   # calculate vectors of min and max x+y coords
   min.x <- min * sin(angles)
   min.y <- min * cos(angles)

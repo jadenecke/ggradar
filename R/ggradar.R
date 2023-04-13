@@ -4,6 +4,7 @@
 #' @param base.size text size
 #' @param font.radar text font family
 #' @param values.radar values to print at minimum, 'average', and maximum gridlines
+#' @param start.degree starting point of the plot, i.e. degree of rotation. Similar to the 'start' variable in coord_polar() in ggplot2.
 #' @param axis.labels  names of axis labels if other than column names supplied via plot.data
 #' @param grid.min value at which mininum grid line is plotted
 #' @param grid.mid value at which 'average' grid line is plotted
@@ -70,6 +71,7 @@ ggradar <- function(plot.data,
                     base.size = 15,
                     font.radar = "sans",
                     values.radar = c("0%", "50%", "100%"),
+                    start.degree = 0,
                     axis.labels = colnames(plot.data)[-1],
                     grid.min = 0, # 10,
                     grid.mid = 0.5, # 50,
@@ -97,13 +99,14 @@ ggradar <- function(plot.data,
                     group.line.width = 1.5,
                     group.point.size = 6,
                     group.colours = NULL,
+                    group.cluster = NULL,
+                    group.cluster.colours = NULL,
                     background.circle.colour = "#D7D6D1",
                     background.circle.transparency = 0.2,
                     plot.legend = if (nrow(plot.data) > 1) TRUE else FALSE,
                     legend.title = "",
                     plot.title = "",
                     legend.text.size = 14,
-
                     legend.position = "left",
                     fill = FALSE,
                     fill.alpha = 0.5) {
@@ -141,12 +144,12 @@ ggradar <- function(plot.data,
   # print(plot.data.offset)
   # (b) convert into radial coords
   group <- NULL
-  group$path <- CalculateGroupPath(plot.data.offset)
+  group$path <- CalculateGroupPath(plot.data.offset, start = start.degree)
 
   # print(group$path)
   # (c) Calculate coordinates required to plot radial variable axes
   axis <- NULL
-  axis$path <- CalculateAxisPath(var.names, grid.min + abs(centre.y), grid.max + abs(centre.y))
+  axis$path <- CalculateAxisPath(var.names, grid.min + abs(centre.y), grid.max + abs(centre.y), start = start.degree)
   # print(axis$path)
   # (d) Create file containing axis labels + associated plotting coordinates
   # Labels
@@ -158,7 +161,8 @@ ggradar <- function(plot.data,
   # print(axis$label)
   # axis label coordinates
   n.vars <- length(var.names)
-  angles <- seq(from = 0, to = 2 * pi, by = (2 * pi) / n.vars)
+  startRadians <- start.degree * (pi/180)
+  angles <- seq(from = 0 + startRadians, to = (2 * pi) + startRadians, by = (2 * pi) / n.vars) %% (2 * pi)
   axis$label$x <- sapply(1:n.vars, function(i, x) {
     ((grid.max + abs(centre.y)) * axis.label.offset) * sin(angles[i])
   })
@@ -187,9 +191,39 @@ ggradar <- function(plot.data,
     x = gridline.label.offset, y = grid.mid + abs(centre.y),
     text = as.character(grid.mid)
   )
+
   # print(gridline$min$label)
   # print(gridline$max$label)
   # print(gridline$mid$label)
+  
+  ### Group Clustering
+  if (!is.null(group.cluster)){
+    if(length(group.cluster) != (n.vars)){
+      stop(paste("'group.cluster' is not the same length as the number of variables in the model.", length(group.cluster), "/", n.vars), call. = FALSE)
+    }
+    group.cluster.length <- length(group.cluster)
+    group.cluster.lwt <- 3
+    group.cluster.granularity <- 13 # must be uneven and >= 3
+    group.cluster.disconnect <- group.cluster != c(group.cluster[-1], group.cluster[1])
+    group.cluster.fullCircle <- apply(funcCircleCoords(c(0, 0),
+                                                 grid.max + abs(centre.y) * 1.1,
+                                                 npoints = group.cluster.length * group.cluster.granularity,
+                                                 start = 90 + start.degree
+                                                 ), 2, rev)
+    group.cluster.segmentCircle <- split(as.data.frame(group.cluster.fullCircle), rep(cumsum(group.cluster.disconnect) +1, each = group.cluster.granularity) %% (length(unique(group.cluster))))
+    group.cluster.segmentCircle <- c(list(group.cluster.segmentCircle[[1]][-nrow(group.cluster.segmentCircle[[1]]), ]),
+                                     lapply(group.cluster.segmentCircle[-1], function(m){return(m[-1, ])}))
+    #group.cluster.segmentCircle <- lapply(group.cluster.segmentCircle, as.data.frame)
+    if(is.null(group.cluster.colours)){
+      group.cluster.colours <- sample(grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)], length(unique(group.cluster)))
+    }
+    str(group.cluster.segmentCircle)
+  }
+  
+  
+  
+  
+  
   ### Start building up the radar plot
 
   # Declare 'theme_clear', with or without a plot legend as required by user
@@ -239,6 +273,16 @@ ggradar <- function(plot.data,
     data = gridline$max$path, aes(x = x, y = y),
     lty = gridline.max.linetype, colour = gridline.max.colour, size = grid.line.width
   )
+  
+  # + group clusters
+  if(!is.null(group.cluster)){
+    for(i in seq_along(group.cluster.segmentCircle)){
+      base <- base + geom_path(
+        data = group.cluster.segmentCircle[[i]], aes(x = x, y = y),
+        lty = 1, colour = group.cluster.colours[i], size = group.cluster.lwt
+      )
+    }
+  }
 
   # + axis labels for any vertical axes [abs(x)<=x.centre.range]
   base <- base + geom_text(

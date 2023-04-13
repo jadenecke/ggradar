@@ -8,7 +8,7 @@
 #' 
 #' @source 
 #' Code adapted from a solution posted by Tony M to \url{http://stackoverflow.com/questions/9614433/creating-radar-chart-a-k-a-star-plot-spider-plot-using-ggplot2-in-r}.
-CalculateGroupPath <- function(df) {
+CalculateGroupPath <- function(df, start = 0) {
   # Drop dead levels. This might happen if the data is filtered on the way
   # into ggradar.
   path <- forcats::fct_drop(df[, 1])
@@ -17,7 +17,8 @@ CalculateGroupPath <- function(df) {
   
   ## find increment
   nPathPoints <- ncol(df) - 1
-  angles <- seq(from = 0, to = 2 * pi, by = (2 * pi) / nPathPoints)
+  startRadians <- start * (pi/180)
+  angles <- seq(from = 0 + startRadians, to = (2 * pi) + startRadians, by = (2 * pi) / nPathPoints) %% (2 * pi)
   ## create graph data frame
   nDataPoints <- ncol(df) * length(levels(path))
   graphData <- data.frame(
