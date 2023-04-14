@@ -43,6 +43,7 @@
 #' @param fill.alpha if filling polygons, transparency values
 #'
 #' @import ggplot2
+#' @import ggnewscale
 #' @return a ggplot object
 #'
 #' @name ggradar-package
@@ -67,6 +68,12 @@
 #' mtcars_radar
 #' ggradar(mtcars_radar)
 #' }
+#' 
+#' 
+#' # install.packages("remotes")
+#' remotes::install_github("AllanCameron/geomtextpath")
+#' 
+#' 
 ggradar <- function(plot.data,
                     base.size = 15,
                     font.radar = "sans",
@@ -101,6 +108,8 @@ ggradar <- function(plot.data,
                     group.colours = NULL,
                     group.cluster = NULL,
                     group.cluster.lwt = 3,
+                    group.cluster.alpha = 1,
+                    group.cluster.relRad = 1.3,
                     group.cluster.colours = NULL,
                     background.circle.colour = "#D7D6D1",
                     background.circle.transparency = 0.2,
@@ -208,12 +217,12 @@ ggradar <- function(plot.data,
     group.cluster.disconnect <- group.cluster != c(group.cluster[length(group.cluster)], group.cluster[-length(group.cluster)])
 
     group.cluster.fullCircle <- apply(funcCircleCoords(c(0, 0),
-                                                 grid.max + abs(centre.y) * 1.3,
+                                                 grid.max + abs(centre.y) * group.cluster.relRad,
                                                  npoints = group.cluster.length * group.cluster.granularity,
                                                  start = 90 - start.degree + (360 / group.cluster.length  /2)
                                                  ), 2, rev)
     group.cluster.segmentCircle <- split(as.data.frame(group.cluster.fullCircle), rep(cumsum(group.cluster.disconnect) +1, each = group.cluster.granularity))
-    group.cluster.overlap0 <- length(group.cluster.segmentCircle) > length(unique(group.cluster))
+    group.cluster.overlap0 <- group.cluster[1] == group.cluster[length(group.cluster)]
     if(group.cluster.overlap0){
       group.cluster.segmentCircle <- c(list(rbind.data.frame(group.cluster.segmentCircle[[length(group.cluster.segmentCircle)]],
                                                              group.cluster.segmentCircle[[1]])),
@@ -221,11 +230,13 @@ ggradar <- function(plot.data,
     }
     # group.cluster.segmentCircle <- c(list(group.cluster.segmentCircle[[1]][-nrow(group.cluster.segmentCircle[[1]]), ]),
     #                                  lapply(group.cluster.segmentCircle[-1], function(m){return(m[-1, ])}))
-    group.cluster.segmentCircle <- c(list(group.cluster.segmentCircle[[1]][ifelse(group.cluster.overlap0, -c(1:50), c(-1, -2)), ]),
+    group.cluster.segmentCircle <- c(list(group.cluster.segmentCircle[[1]][-c(1, 2), ]),
                                      lapply(group.cluster.segmentCircle[-1], function(m){return(m[-1, ])}))
     if(is.null(group.cluster.colours)){
       group.cluster.colours <- sample(grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)], length(unique(group.cluster)))
     }
+    group.cluster.coloursSegments <- as.character(factor(group.cluster[group.cluster.disconnect], labels=group.cluster.colours))
+    group.cluster.labels <- group.cluster[group.cluster.disconnect]
     str(group.cluster.segmentCircle)
   }
   
@@ -259,9 +270,32 @@ ggradar <- function(plot.data,
   # [abs(x) < x.centre.range]; then left-justified axis labels to right of Y axis [x>0].
   # This building up the plot in layers doesn't allow ggplot to correctly
   # identify plot extent when plotting first (base) layer]
-
+  
+  
+  
+  
+  
   # base layer = axis labels for axes to left of central y-axis [x< -(x.centre.range)]
-  base <- ggplot(axis$label) + xlab(NULL) + ylab(NULL) + coord_equal() +
+  base <- ggplot(axis$label) + xlab(NULL) + ylab(NULL) + coord_equal()
+    # + group clusters
+    if(!is.null(group.cluster)){
+      for(i in seq_along(group.cluster.segmentCircle)){
+        base <- base + geom_path(
+          data = group.cluster.segmentCircle[[i]], aes(x = x, y = y),
+          lty = 1, colour = group.cluster.coloursSegments[i], size = group.cluster.lwt,
+          alpha = group.cluster.alpha
+        )
+        
+        base <- base + geom_textpath(
+          data = group.cluster.segmentCircle[[i]],
+          aes(x = x, y = y),
+          label = group.cluster.labels[i],
+          size = group.cluster.lwt,
+          text_only = TRUE,
+          fontface = "bold"
+        )
+      }
+    base <- base + 
     geom_text(
       data = subset(axis$label, axis$label$x < (-x.centre.range)),
       aes(x = x, y = y, label = text), size = axis.label.size, hjust = 1, family = font.radar
@@ -283,14 +317,15 @@ ggradar <- function(plot.data,
     lty = gridline.max.linetype, colour = gridline.max.colour, size = grid.line.width
   )
   
-  # + group clusters
-  if(!is.null(group.cluster)){
-    for(i in seq_along(group.cluster.segmentCircle)){
-      base <- base + geom_path(
-        data = group.cluster.segmentCircle[[i]], aes(x = x, y = y),
-        lty = 1, colour = group.cluster.colours[i], size = group.cluster.lwt
-      )
-    }
+  
+    # base <- base + geom_blank(aes(group = group.cluster,
+    #                               colour = as.character(factor(group.cluster, labels=group.cluster.coloursSegments))))
+    # base <- base + scale_fill_manual(name="Clustering",
+    #                                     values  = unique(group.cluster.coloursSegments),
+    #                                     labels = unique(group.cluster),
+    #                                     drop = FALSE)
+    #base <- base + ggnewscale::new_scale_colour()
+    
   }
 
   # + axis labels for any vertical axes [abs(x)<=x.centre.range]
