@@ -100,6 +100,7 @@ ggradar <- function(plot.data,
                     group.point.size = 6,
                     group.colours = NULL,
                     group.cluster = NULL,
+                    group.cluster.lwt = 3,
                     group.cluster.colours = NULL,
                     background.circle.colour = "#D7D6D1",
                     background.circle.transparency = 0.2,
@@ -202,18 +203,26 @@ ggradar <- function(plot.data,
       stop(paste("'group.cluster' is not the same length as the number of variables in the model.", length(group.cluster), "/", n.vars), call. = FALSE)
     }
     group.cluster.length <- length(group.cluster)
-    group.cluster.lwt <- 3
-    group.cluster.granularity <- 13 # must be uneven and >= 3
-    group.cluster.disconnect <- group.cluster != c(group.cluster[-1], group.cluster[1])
+    group.cluster.granularity <- 25 
+    #group.cluster.disconnect <- group.cluster != c(group.cluster[-1], group.cluster[1])
+    group.cluster.disconnect <- group.cluster != c(group.cluster[length(group.cluster)], group.cluster[-length(group.cluster)])
+
     group.cluster.fullCircle <- apply(funcCircleCoords(c(0, 0),
-                                                 grid.max + abs(centre.y) * 1.1,
+                                                 grid.max + abs(centre.y) * 1.3,
                                                  npoints = group.cluster.length * group.cluster.granularity,
-                                                 start = 90 + start.degree
+                                                 start = 90 - start.degree + (360 / group.cluster.length  /2)
                                                  ), 2, rev)
-    group.cluster.segmentCircle <- split(as.data.frame(group.cluster.fullCircle), rep(cumsum(group.cluster.disconnect) +1, each = group.cluster.granularity) %% (length(unique(group.cluster))))
-    group.cluster.segmentCircle <- c(list(group.cluster.segmentCircle[[1]][-nrow(group.cluster.segmentCircle[[1]]), ]),
+    group.cluster.segmentCircle <- split(as.data.frame(group.cluster.fullCircle), rep(cumsum(group.cluster.disconnect) +1, each = group.cluster.granularity))
+    group.cluster.overlap0 <- length(group.cluster.segmentCircle) > length(unique(group.cluster))
+    if(group.cluster.overlap0){
+      group.cluster.segmentCircle <- c(list(rbind.data.frame(group.cluster.segmentCircle[[length(group.cluster.segmentCircle)]],
+                                                             group.cluster.segmentCircle[[1]])),
+                                            group.cluster.segmentCircle[-c(1, length(group.cluster.segmentCircle))])
+    }
+    # group.cluster.segmentCircle <- c(list(group.cluster.segmentCircle[[1]][-nrow(group.cluster.segmentCircle[[1]]), ]),
+    #                                  lapply(group.cluster.segmentCircle[-1], function(m){return(m[-1, ])}))
+    group.cluster.segmentCircle <- c(list(group.cluster.segmentCircle[[1]][ifelse(group.cluster.overlap0, -c(1:50), c(-1, -2)), ]),
                                      lapply(group.cluster.segmentCircle[-1], function(m){return(m[-1, ])}))
-    #group.cluster.segmentCircle <- lapply(group.cluster.segmentCircle, as.data.frame)
     if(is.null(group.cluster.colours)){
       group.cluster.colours <- sample(grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)], length(unique(group.cluster)))
     }
