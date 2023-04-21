@@ -234,8 +234,11 @@ ggradar <- function(plot.data,
                                      lapply(group.cluster.segmentCircle[-1], function(m){return(m[-1, ])}))
     if(is.null(group.cluster.colours)){
       group.cluster.colours <- sample(grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)], length(unique(group.cluster)))
+      group.cluster.coloursSegments <- as.character(factor(group.cluster[group.cluster.disconnect], labels=group.cluster.colours))
+    } else {
+      group.cluster.coloursSegments <- group.cluster.colours
     }
-    group.cluster.coloursSegments <- as.character(factor(group.cluster[group.cluster.disconnect], labels=group.cluster.colours))
+    
     group.cluster.labels <- group.cluster[group.cluster.disconnect]
     str(group.cluster.segmentCircle)
   }
