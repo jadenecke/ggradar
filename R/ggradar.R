@@ -77,29 +77,23 @@
 ggradar <- function(plot.data,
                     base.size = 15,
                     font.radar = "sans",
-                    values.radar = c("0%", "50%", "100%"),
                     start.degree = 0,
                     axis.labels = colnames(plot.data)[-1],
-                    grid.min = 0, # 10,
-                    grid.mid = 0.5, # 50,
-                    grid.max = 1, # 100,
                     centre.y = grid.min - ((1 / 9) * (grid.max - grid.min)),
                     plot.extent.x.sf = 1,
                     plot.extent.y.sf = 1.2,
                     x.centre.range = 0.02 * (grid.max - centre.y),
                     label.centre.y = FALSE,
                     grid.line.width = 0.5,
-                    gridline.min.linetype = "longdash",
-                    gridline.mid.linetype = "longdash",
-                    gridline.max.linetype = "longdash",
-                    gridline.min.colour = "grey",
-                    gridline.mid.colour = "#007A87",
-                    gridline.max.colour = "grey",
+                    grid.min = gridline[1],
+                    grid.max = gridline[length(gridline)],
+                    gridline = 0, 
+                    gridline.label = TRUE,
+                    girdline.labels = as.character(gridline),
+                    gridline.linetype = "longdash",
+                    gridline.colour = "grey",
                     grid.label.size = 6,
                     gridline.label.offset = -0.1 * (grid.max - centre.y),
-                    label.gridline.min = TRUE,
-                    label.gridline.mid = TRUE,
-                    label.gridline.max = TRUE,
                     axis.label.offset = 1.15,
                     axis.label.size = 5,
                     axis.line.colour = "grey",
@@ -119,7 +113,8 @@ ggradar <- function(plot.data,
                     legend.text.size = 14,
                     legend.position = "left",
                     fill = FALSE,
-                    fill.alpha = 0.5) {
+                    fill.alpha = 0.5,
+                    theme_black = FALSE) {
   plot.data <- as.data.frame(plot.data)
 
   if(!is.factor(plot.data[, 1])) {
@@ -183,24 +178,7 @@ ggradar <- function(plot.data,
   # (e) Create Circular grid-lines + labels
   # caclulate the cooridinates required to plot circular grid-lines for three user-specified
   # y-axis values: min, mid and max [grid.min; grid.mid; grid.max]
-  gridline <- NULL
-  gridline$min$path <- funcCircleCoords(c(0, 0), grid.min + abs(centre.y), npoints = 360)
-  gridline$mid$path <- funcCircleCoords(c(0, 0), grid.mid + abs(centre.y), npoints = 360)
-  gridline$max$path <- funcCircleCoords(c(0, 0), grid.max + abs(centre.y), npoints = 360)
-  # print(head(gridline$max$path))
-  # gridline labels
-  gridline$min$label <- data.frame(
-    x = gridline.label.offset, y = grid.min + abs(centre.y),
-    text = as.character(grid.min)
-  )
-  gridline$max$label <- data.frame(
-    x = gridline.label.offset, y = grid.max + abs(centre.y),
-    text = as.character(grid.max)
-  )
-  gridline$mid$label <- data.frame(
-    x = gridline.label.offset, y = grid.mid + abs(centre.y),
-    text = as.character(grid.mid)
-  )
+  
 
   # print(gridline$min$label)
   # print(gridline$max$label)
@@ -298,27 +276,39 @@ ggradar <- function(plot.data,
           fontface = "bold"
         )
       }
+    }
     base <- base + 
     geom_text(
       data = subset(axis$label, axis$label$x < (-x.centre.range)),
-      aes(x = x, y = y, label = text), size = axis.label.size, hjust = 1, family = font.radar
+      aes(x = x, y = y, label = text), size = axis.label.size, hjust = 1, family = font.radar, colour = ifelse(theme_black, "white", "black")
     ) +
     scale_x_continuous(limits = c(-1.5 * plot.extent.x, 1.5 * plot.extent.x)) +
     scale_y_continuous(limits = c(-plot.extent.y, plot.extent.y))
 
   # ... + circular grid-lines at 'min', 'mid' and 'max' y-axis values
-  base <- base + geom_path(
-    data = gridline$min$path, aes(x = x, y = y),
-    lty = gridline.min.linetype, colour = gridline.min.colour, size = grid.line.width
-  )
-  base <- base + geom_path(
-    data = gridline$mid$path, aes(x = x, y = y),
-    lty = gridline.mid.linetype, colour = gridline.mid.colour, size = grid.line.width
-  )
-  base <- base + geom_path(
-    data = gridline$max$path, aes(x = x, y = y),
-    lty = gridline.max.linetype, colour = gridline.max.colour, size = grid.line.width
-  )
+  # base <- base + geom_path(
+  #   data = gridline$min$path, aes(x = x, y = y),
+  #   lty = gridline.min.linetype, colour = gridline.min.colour, size = grid.line.width
+  # )
+  # base <- base + geom_path(
+  #   data = gridline$mid$path, aes(x = x, y = y),
+  #   lty = gridline.mid.linetype, colour = gridline.mid.colour, size = grid.line.width
+  # )
+  # base <- base + geom_path(
+  #   data = gridline$max$path, aes(x = x, y = y),
+  #   lty = gridline.max.linetype, colour = gridline.max.colour, size = grid.line.width
+  # )
+  for(i in seq_along(gridline)){
+    line <- gridline[i]
+    curGridline <- funcCircleCoords(c(0, 0), line + abs(centre.y), npoints = 360)
+    
+    # gridline labels
+    base <- base + geom_path(
+      data = curGridline, aes(x = x, y = y),
+      lty = gridline.linetype[min(c(i, length(gridline.linetype)))], colour = gridline.colour[min(c(i, length(gridline.colour)))], size = grid.line.width
+    )
+
+  }
   
   
     # base <- base + geom_blank(aes(group = group.cluster,
@@ -329,24 +319,24 @@ ggradar <- function(plot.data,
     #                                     drop = FALSE)
     #base <- base + ggnewscale::new_scale_colour()
     
-  }
+  
 
   # + axis labels for any vertical axes [abs(x)<=x.centre.range]
   base <- base + geom_text(
     data = subset(axis$label, abs(axis$label$x) <= x.centre.range),
-    aes(x = x, y = y, label = text), size = axis.label.size, hjust = 0.5, family = font.radar
+    aes(x = x, y = y, label = text), size = axis.label.size, hjust = 0.5, family = font.radar, colour = ifelse(theme_black, "white", "black")
   )
   # + axis labels for any vertical axes [x>x.centre.range]
   base <- base + geom_text(
     data = subset(axis$label, axis$label$x > x.centre.range),
-    aes(x = x, y = y, label = text), size = axis.label.size, hjust = 0, family = font.radar
+    aes(x = x, y = y, label = text), size = axis.label.size, hjust = 0, family = font.radar, colour = ifelse(theme_black, "white", "black")
   )
   # + theme_clear [to remove grey plot background, grid lines, axis tick marks and axis text]
   base <- base + theme_clear
   #  + background circle against which to plot radar data
   base <- base + geom_polygon(
-    data = gridline$max$path, aes(x, y),
-    fill = background.circle.colour,
+    data = curGridline, aes(x, y),
+    fill = ifelse(theme_black, "black", background.circle.colour),
     alpha = background.circle.transparency
   )
 
@@ -376,20 +366,38 @@ ggradar <- function(plot.data,
   # ... + amend Legend title
   if (plot.legend == TRUE) base <- base + labs(colour = legend.title, size = legend.text.size)
 
-  # ... + grid-line labels (max; mid; min)
-  if (label.gridline.min == TRUE) {
-    base <- base + geom_text(aes(x = x, y = y, label = values.radar[1]), data = gridline$min$label, size = grid.label.size * 0.8, hjust = 1, family = font.radar)
+  # # ... + grid-line labels (max; mid; min)
+  # if (label.gridline.min == TRUE) {
+  #   base <- base + geom_text(aes(x = x, y = y, label = values.radar[1]), data = gridline$min$label, size = grid.label.size * 0.8, hjust = 1, family = font.radar, colour = ifelse(theme_black, "white", "black"))
+  # }
+  # if (label.gridline.mid == TRUE) {
+  #   base <- base + geom_text(aes(x = x, y = y, label = values.radar[2]), data = gridline$mid$label, size = grid.label.size * 0.8, hjust = 1, family = font.radar, colour = ifelse(theme_black, "white", "black"))
+  # }
+  
+  for(i in seq_along(gridline)){
+    line <- gridline[i]
+    curLabelPos <- data.frame(
+      x = gridline.label.offset, y = line + abs(centre.y),
+      text = as.character(line)
+    )
+    print(str(curLabelPos))
+    base <- base + geom_text(aes(x = x, y = y),
+                             label = girdline.labels[min(i, length(girdline.labels))],
+                             data = curLabelPos,
+                             size = grid.label.size * 0.8,
+                             hjust = 1,
+                             family = font.radar,
+                             colour = ifelse(theme_black, "white", "black"))
   }
-  if (label.gridline.mid == TRUE) {
-    base <- base + geom_text(aes(x = x, y = y, label = values.radar[2]), data = gridline$mid$label, size = grid.label.size * 0.8, hjust = 1, family = font.radar)
-  }
-  if (label.gridline.max == TRUE) {
-    base <- base + geom_text(aes(x = x, y = y, label = values.radar[3]), data = gridline$max$label, size = grid.label.size * 0.8, hjust = 1, family = font.radar)
-  }
+  
+
+  
+  
+  
   # ... + centre.y label if required [i.e. value of y at centre of plot circle]
   if (label.centre.y == TRUE) {
     centre.y.label <- data.frame(x = 0, y = 0, text = as.character(centre.y))
-    base <- base + geom_text(aes(x = x, y = y, label = text), data = centre.y.label, size = grid.label.size, hjust = 0.5, family = font.radar)
+    base <- base + geom_text(aes(x = x, y = y, label = text), data = centre.y.label, size = grid.label.size, hjust = 0.5, family = font.radar, colour = ifelse(theme_black, "white", "black"))
   }
 
   if (!is.null(group.colours)) {
@@ -423,6 +431,26 @@ ggradar <- function(plot.data,
 
   if (plot.title != "") {
     base <- base + ggtitle(plot.title)
+  }
+  
+  if(theme_black){
+    base <- base + #theme_dark() + 
+      theme(
+        plot.background = element_rect(color = "black", fill = "black"),
+        panel.background = element_rect(fill = "black", color  =  "black"),
+        strip.background = element_rect(fill = "grey30", color = "grey10"),
+        strip.text.x = element_text(color = "white"),
+        strip.text.y = element_text(
+          color = "white",
+          angle = -90
+        ),
+        legend.text=element_text(color="white"),
+        legend.title=element_text(color="white"),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        legend.key=element_blank(),
+        text = element_text(colour = "white")
+      ) 
   }
 
   return(base)
